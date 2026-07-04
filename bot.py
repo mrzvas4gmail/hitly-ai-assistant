@@ -55,8 +55,8 @@ def start(message):
         "Я AI-консультант по Hitly и автоматизации бизнеса.\n\n"
         "Помогу понять:\n"
         "• какие процессы можно автоматизировать;\n"
-        "• как не терять заявки;\n"
-        "• подойдет ли Hitly вашему бизнесу;\n"
+        "• где бизнес может терять заявки;\n"
+        "• подойдет ли Hitly вашей компании;\n"
         "• с чего начать внедрение.\n\n"
         "Выберите раздел:"
     )
@@ -255,19 +255,14 @@ def handle_audit(message, state):
         state["step"] = "goal"
         bot.send_message(
             chat_id,
-            "7/7 Что вы хотите улучшить в первую очередь?\n\n"
-            "Например: больше заявок, быстрее отвечать, автоматизировать продажи, контролировать менеджеров."
+            "7/7 Что хотите улучшить в первую очередь?\n\n"
+            "Например: быстрее отвечать, автоматизировать продажи, контролировать менеджеров, не терять заявки."
         )
         return
 
     if state["step"] == "goal":
         state["goal"] = answer
-
         report = generate_audit_report(state)
-
-        user_state.pop(chat_id, None)
-
-        bot.send_message(chat_id, report, reply_markup=action_menu())
 
         notify_admin(
             "🔎 <b>Пользователь прошел AI-аудит</b>\n\n"
@@ -281,6 +276,9 @@ def handle_audit(message, state):
             f"User ID: {chat_id}"
         )
 
+        user_state.pop(chat_id, None)
+        bot.send_message(chat_id, report, reply_markup=action_menu())
+
 
 def generate_audit_report(state):
     business = state.get("business_type", "")
@@ -292,16 +290,15 @@ def generate_audit_report(state):
     goal = state.get("goal", "")
 
     risk_score = 0
+    text = f"{crm} {loss_problem} {response_time} {channels}".lower()
 
-    low_text = f"{crm} {loss_problem} {response_time} {channels}".lower()
-
-    if "нет" in low_text or "таблиц" in low_text:
+    if "нет" in text or "таблиц" in text:
         risk_score += 2
-    if "долго" in low_text or "час" in low_text or "следующий" in low_text:
+    if "долго" in text or "час" in text or "следующ" in text:
         risk_score += 2
-    if "забы" in low_text or "теря" in low_text:
+    if "забы" in text or "теря" in text:
         risk_score += 2
-    if "авито" in low_text or "telegram" in low_text or "whatsapp" in low_text or "реклама" in low_text:
+    if "авито" in text or "telegram" in text or "whatsapp" in text or "реклама" in text:
         risk_score += 1
 
     if risk_score <= 2:
@@ -336,8 +333,7 @@ def generate_audit_report(state):
         "• повторные касания;\n"
         "• контроль заявок и коммуникаций.\n\n"
         "<b>Рекомендация:</b>\n"
-        "Начать с простого сценария: автоматизация первого ответа клиенту и фиксация каждой заявки. "
-        "Это поможет быстрее реагировать на обращения и снизить риск потери потенциальных клиентов.\n\n"
+        "Начать с простого сценария: автоматизация первого ответа клиенту и фиксация каждой заявки.\n\n"
         "Можете оставить заявку на консультацию или подключить Hitly по партнерской ссылке."
     )
 
@@ -362,13 +358,7 @@ def handle_lead(message, state):
         state["phone"] = text
         state["telegram"] = f"@{message.from_user.username}" if message.from_user.username else "не указан"
 
-        save_lead(
-            chat_id,
-            state["name"],
-            state["company"],
-            state["phone"],
-            state["telegram"]
-        )
+        save_lead(chat_id, state["name"], state["company"], state["phone"], state["telegram"])
 
         lead_text = (
             "🔥 <b>Новый лид из Telegram-бота</b>\n\n"
