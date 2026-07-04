@@ -1,13 +1,10 @@
+import config
 import telebot
 from telebot import types
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request
 
-import config
 from ai import ask_ai
 from database import init_db, save_user, save_lead, get_stats
-
-if not config.BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN is empty. Add BOT_TOKEN in Render Environment.")
 
 bot = telebot.TeleBot(config.BOT_TOKEN, parse_mode="HTML")
 app = FastAPI()
@@ -17,30 +14,31 @@ user_state = {}
 def main_menu():
     kb = types.InlineKeyboardMarkup(row_width=1)
     kb.add(
-        types.InlineKeyboardButton("🤖 Спросить AI-консультанта", callback_data="ask_ai"),
-        types.InlineKeyboardButton("🏗️ Возможности Hitly для бизнеса", callback_data="features"),
+        types.InlineKeyboardButton("🤖 AI-консультант", callback_data="ai"),
+        types.InlineKeyboardButton("🏗️ Возможности Hitly", callback_data="features"),
         types.InlineKeyboardButton("💼 Подойдет ли моему бизнесу", callback_data="fit"),
         types.InlineKeyboardButton("🚀 Как подключиться", callback_data="connect"),
-        types.InlineKeyboardButton("📞 Бесплатная консультация", callback_data="lead"),
+        types.InlineKeyboardButton("📞 Получить консультацию", callback_data="lead"),
     )
     return kb
 
 
-def after_answer_menu():
+def action_menu():
     kb = types.InlineKeyboardMarkup(row_width=1)
     kb.add(
         types.InlineKeyboardButton("🚀 Подключить Hitly", url=config.PARTNER_LINK),
         types.InlineKeyboardButton("📞 Получить консультацию", callback_data="lead"),
-        types.InlineKeyboardButton("🤖 Задать еще вопрос", callback_data="ask_ai"),
+        types.InlineKeyboardButton("🤖 Задать еще вопрос", callback_data="ai"),
         types.InlineKeyboardButton("🏠 Главное меню", callback_data="menu"),
     )
     return kb
 
 
 def notify_admin(text):
-    if config.ADMIN_CHAT_ID:
+    admin_id = str(config.ADMIN_CHAT_ID).strip()
+    if admin_id:
         try:
-            bot.send_message(int(config.ADMIN_CHAT_ID), text)
+            bot.send_message(int(admin_id), text)
         except Exception as e:
             print("Admin notify error:", e)
 
@@ -49,18 +47,19 @@ def notify_admin(text):
 def start(message):
     save_user(message.from_user)
     user_state.pop(message.chat.id, None)
-    bot.send_message(
-        message.chat.id,
+
+    text = (
         "👋 <b>Здравствуйте!</b>\n\n"
         "Я AI-консультант по Hitly и автоматизации бизнеса.\n\n"
         "Помогу понять:\n"
+        "• как Hitly может помочь вашему бизнесу;\n"
         "• какие процессы можно автоматизировать;\n"
-        "• как Hitly может помочь с заявками и продажами;\n"
-        "• подойдет ли решение вашему бизнесу;\n"
+        "• подойдет ли решение вашей компании;\n"
         "• как подключиться и с чего начать.\n\n"
-        "Выберите действие:",
-        reply_markup=main_menu(),
+        "Выберите раздел:"
     )
+
+    bot.send_message(message.chat.id, text, reply_markup=main_menu())
 
 
 @bot.message_handler(commands=["myid"])
@@ -70,11 +69,17 @@ def myid(message):
 
 @bot.message_handler(commands=["stats"])
 def stats(message):
-    if str(message.chat.id) != str(config.ADMIN_CHAT_ID):
+    if str(message.chat.id) != str(config.ADMIN_CHAT_ID).strip():
         bot.send_message(message.chat.id, "Команда доступна только администратору.")
         return
+
     users, leads = get_stats()
-    bot.send_message(message.chat.id, f"📈 <b>Статистика</b>\n\nПользователей: {users}\nЛидов: {leads}")
+    bot.send_message(
+        message.chat.id,
+        f"📈 <b>Статистика</b>\n\n"
+        f"Пользователей: {users}\n"
+        f"Лидов: {leads}"
+    )
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -84,60 +89,66 @@ def callbacks(call):
 
     if call.data == "menu":
         user_state.pop(chat_id, None)
-        bot.edit_message_text("🏠 <b>Главное меню</b>", chat_id, call.message.message_id, reply_markup=main_menu())
+        bot.send_message(chat_id, "🏠 Главное меню", reply_markup=main_menu())
 
-    elif call.data == "ask_ai":
+    elif call.data == "ai":
         user_state[chat_id] = {"mode": "ai"}
         bot.send_message(
             chat_id,
             "🤖 <b>AI-консультант Hitly</b>\n\n"
-            "Напишите вопрос про Hitly, автоматизацию заявок, отдел продаж, CRM или подключение.\n\n"
-            "Например: <i>Как Hitly поможет строительной компании?</i>"
+            "Задайте вопрос про Hitly, автоматизацию, заявки, продажи, CRM или подключение.\n\n"
+            "Например:\n"
+            "• Как Hitly поможет строительной компании?\n"
+            "• Какие процессы можно автоматизировать?\n"
+            "• Как подключиться?\n"
+            "• Подойдет ли Hitly моему бизнесу?"
         )
 
     elif call.data == "features":
-        bot.edit_message_text(
-            "🏗️ <b>Возможности Hitly для бизнеса</b>\n\n"
-            "Hitly можно использовать для автоматизации коммуникаций, обработки заявок "
-            "и контроля клиентского пути.\n\n"
-            "Что это может дать:\n"
-            "• быстрый первый ответ клиенту;\n"
-            "• снижение риска потерять заявку;\n"
-            "• автоматизация типовых вопросов;\n"
-            "• помощь менеджерам;\n"
-            "• понятный следующий шаг для клиента.",
-            chat_id,
-            call.message.message_id,
-            reply_markup=after_answer_menu(),
+        text = (
+            "🏗️ <b>Возможности Hitly</b>\n\n"
+            "Hitly может помочь бизнесу автоматизировать коммуникации, обработку заявок "
+            "и работу с клиентами.\n\n"
+            "<b>Что можно улучшить:</b>\n"
+            "• скорость ответа клиентам;\n"
+            "• обработку заявок из разных каналов;\n"
+            "• первичные консультации;\n"
+            "• повторные касания;\n"
+            "• контроль работы отдела продаж;\n"
+            "• передачу клиента менеджеру.\n\n"
+            "Особенно полезно для строительных компаний, ремонта, девелоперов, услуг и бизнеса с потоком заявок."
         )
+        bot.send_message(chat_id, text, reply_markup=action_menu())
 
     elif call.data == "fit":
-        bot.edit_message_text(
-            "💼 <b>Кому может подойти Hitly?</b>\n\n"
-            "Hitly особенно полезен бизнесу, где есть входящие заявки, менеджеры, переписки "
-            "и необходимость быстро отвечать клиентам.\n\n"
-            "Подходит для строительных компаний, девелоперов, ремонта, отделки, проектирования, "
-            "производства стройматериалов и других компаний с отделом продаж.",
-            chat_id,
-            call.message.message_id,
-            reply_markup=after_answer_menu(),
+        text = (
+            "💼 <b>Подойдет ли Hitly вашему бизнесу?</b>\n\n"
+            "Hitly может быть полезен, если у вас:\n\n"
+            "• есть входящие заявки;\n"
+            "• клиенты пишут в мессенджеры;\n"
+            "• менеджеры не всегда отвечают быстро;\n"
+            "• часть обращений теряется;\n"
+            "• много повторяющихся вопросов;\n"
+            "• нужен порядок в коммуникациях.\n\n"
+            "Чтобы понять точнее, задайте AI-консультанту вопрос о вашей компании."
         )
+        bot.send_message(chat_id, text, reply_markup=action_menu())
 
     elif call.data == "connect":
-        bot.edit_message_text(
+        text = (
             "🚀 <b>Как подключиться к Hitly</b>\n\n"
             "1. Перейдите по партнерской ссылке.\n"
-            "2. Зарегистрируйтесь.\n"
-            "3. Начните с одного процесса: первый ответ клиенту, заявки или типовые вопросы.\n"
-            "4. Если нужна помощь — оставьте заявку на консультацию.",
-            chat_id,
-            call.message.message_id,
-            reply_markup=after_answer_menu(),
+            "2. Зарегистрируйтесь в Hitly.\n"
+            "3. Изучите возможности платформы.\n"
+            "4. Начните с одного процесса: например, первичный ответ клиентам.\n"
+            "5. При необходимости оставьте заявку на консультацию.\n\n"
+            "Лучше начинать не со сложного внедрения, а с конкретной задачи бизнеса."
         )
+        bot.send_message(chat_id, text, reply_markup=action_menu())
 
     elif call.data == "lead":
         user_state[chat_id] = {"mode": "lead", "step": "name"}
-        bot.send_message(chat_id, "📞 <b>Бесплатная консультация</b>\n\nКак вас зовут?")
+        bot.send_message(chat_id, "📞 <b>Заявка на консультацию</b>\n\nКак вас зовут?")
 
     bot.answer_callback_query(call.id)
 
@@ -153,18 +164,26 @@ def text_handler(message):
         return
 
     if state.get("mode") == "ai":
-        question = message.text.strip()
-        if len(question) < 3:
-            bot.send_message(chat_id, "Напишите вопрос чуть подробнее.")
-            return
-        bot.send_chat_action(chat_id, "typing")
-        answer = ask_ai(question)
-        user_state.pop(chat_id, None)
-        bot.send_message(chat_id, answer, reply_markup=after_answer_menu())
+        handle_ai(message)
+
+    elif state.get("mode") == "lead":
+        handle_lead(message, state)
+
+
+def handle_ai(message):
+    chat_id = message.chat.id
+    question = message.text.strip()
+
+    if len(question) < 3:
+        bot.send_message(chat_id, "Напишите вопрос подробнее.")
         return
 
-    if state.get("mode") == "lead":
-        handle_lead(message, state)
+    bot.send_chat_action(chat_id, "typing")
+
+    answer = ask_ai(question)
+
+    bot.send_message(chat_id, answer, reply_markup=action_menu())
+    user_state.pop(chat_id, None)
 
 
 def handle_lead(message, state):
@@ -186,8 +205,16 @@ def handle_lead(message, state):
     if state["step"] == "phone":
         state["phone"] = text
         state["telegram"] = f"@{message.from_user.username}" if message.from_user.username else "не указан"
-        save_lead(chat_id, state["name"], state["company"], state["phone"], state["telegram"])
-        notify_admin(
+
+        save_lead(
+            chat_id,
+            state["name"],
+            state["company"],
+            state["phone"],
+            state["telegram"]
+        )
+
+        lead_text = (
             "🔥 <b>Новый лид из Telegram-бота</b>\n\n"
             f"Имя: {state['name']}\n"
             f"Компания: {state['company']}\n"
@@ -195,32 +222,44 @@ def handle_lead(message, state):
             f"Telegram: {state['telegram']}\n"
             f"User ID: {chat_id}"
         )
+
+        notify_admin(lead_text)
         user_state.pop(chat_id, None)
-        bot.send_message(chat_id, "Спасибо! Заявка принята ✅", reply_markup=after_answer_menu())
+
+        bot.send_message(
+            chat_id,
+            "Спасибо! Заявка принята ✅\n\n"
+            "Также вы можете сразу подключить Hitly по партнерской ссылке ниже.",
+            reply_markup=action_menu()
+        )
 
 
 @app.on_event("startup")
 def on_startup():
     init_db()
-    if not config.WEBHOOK_URL:
-        print("WEBHOOK_URL is empty. Add WEBHOOK_URL in Render Environment.")
-        return
-    webhook = f"{config.WEBHOOK_URL}/webhook/{config.BOT_TOKEN}"
+
+    webhook_url = config.WEBHOOK_URL.rstrip("/") + f"/webhook/{config.BOT_TOKEN}"
+
     bot.remove_webhook()
-    bot.set_webhook(url=webhook)
-    print("Webhook set:", webhook.replace(config.BOT_TOKEN, "***"))
+    bot.set_webhook(url=webhook_url)
+
+    print("Бот запущен ✅")
+    print("Webhook set:", webhook_url)
 
 
 @app.get("/")
-def root():
-    return {"status": "ok", "service": "Hitly AI Telegram Bot"}
+def home():
+    return {"status": "ok", "message": "Hitly AI Assistant is running"}
 
 
 @app.post("/webhook/{token}")
-async def webhook(token: str, request: Request):
+async def telegram_webhook(token: str, request: Request):
     if token != config.BOT_TOKEN:
-        raise HTTPException(status_code=403, detail="Forbidden")
-    json_data = await request.json()
-    update = types.Update.de_json(json_data)
+        return {"ok": False}
+
+    data = await request.json()
+    update = telebot.types.Update.de_json(data)
     bot.process_new_updates([update])
+
     return {"ok": True}
+    
