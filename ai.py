@@ -45,9 +45,9 @@ def ask_ai(question: str) -> str:
         return response.choices[0].message.content.strip()
 
     except Exception as e:
-        print("AI error:", repr(e))
-        return (
-            "AI-консультант временно недоступен.\n\n"
-            "Возможная причина: OpenAI API-ключ, баланс или лимит проекта.\n"
-            "Можно оставить заявку на консультацию или подключить Hitly по партнерской ссылке."
-        )
+    import traceback
+    traceback.print_exc()
+
+    return (
+        f"Ошибка OpenAI:\n{e}"
+    )
