@@ -1,5 +1,6 @@
 import config
 from openai import OpenAI
+import traceback
 
 SYSTEM_PROMPT = """
 Ты AI-консультант по Hitly и автоматизации бизнеса.
@@ -25,9 +26,7 @@ def ask_ai(question: str) -> str:
         return "Напишите ваш вопрос по Hitly или автоматизации бизнеса."
 
     if not config.OPENAI_API_KEY:
-        return (
-            "AI-консультант пока не подключен: в Render не найден OPENAI_API_KEY."
-        )
+        return "AI-консультант пока не подключен: в Render не найден OPENAI_API_KEY."
 
     try:
         client = OpenAI(api_key=config.OPENAI_API_KEY)
@@ -35,8 +34,14 @@ def ask_ai(question: str) -> str:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": question},
+                {
+                    "role": "system",
+                    "content": SYSTEM_PROMPT
+                },
+                {
+                    "role": "user",
+                    "content": question
+                },
             ],
             temperature=0.4,
             max_tokens=700,
@@ -45,9 +50,5 @@ def ask_ai(question: str) -> str:
         return response.choices[0].message.content.strip()
 
     except Exception as e:
-    import traceback
-    traceback.print_exc()
-
-    return (
-        f"Ошибка OpenAI:\n{e}"
-    )
+        traceback.print_exc()
+        return f"Ошибка OpenAI:\n{e}"
