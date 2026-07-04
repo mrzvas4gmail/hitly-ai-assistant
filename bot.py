@@ -1,5 +1,6 @@
 import config
 import telebot
+from site_audit import analyze_site
 from telebot import types
 from fastapi import FastAPI, Request
 
@@ -20,6 +21,7 @@ def main_menu():
         types.InlineKeyboardButton("💼 Подойдет ли моему бизнесу", callback_data="fit"),
         types.InlineKeyboardButton("🚀 Как подключиться", callback_data="connect"),
         types.InlineKeyboardButton("📞 Получить консультацию", callback_data="lead"),
+        types.InlineKeyboardButton("🌐 Анализ сайта", callback_data="site_audit"),
     )
     return kb
 
@@ -91,6 +93,16 @@ def callbacks(call):
     if call.data == "menu":
         user_state.pop(chat_id, None)
         bot.send_message(chat_id, "🏠 Главное меню", reply_markup=main_menu())
+        
+        elif call.data == "site_audit":
+    user_state[chat_id] = {"mode": "site_audit"}
+    bot.send_message(
+        chat_id,
+        "🌐 <b>AI-анализ сайта</b>\n\n"
+        "Отправьте ссылку на сайт.\n\n"
+        "Например:\n"
+        "https://example.ru"
+    )
 
     elif call.data == "ai":
         user_state[chat_id] = {"mode": "ai"}
@@ -160,12 +172,37 @@ def callbacks(call):
 
     bot.answer_callback_query(call.id)
 
+def handle_site_audit(message):
+    chat_id = message.chat.id
+    site_url = message.text.strip()
+
+    if not site_url.startswith("http"):
+        bot.send_message(
+            chat_id,
+            "Пожалуйста, отправьте ссылку в формате:\nhttps://example.ru"
+        )
+        return
+
+    bot.send_chat_action(chat_id, "typing")
+
+    result = analyze_site(site_url)
+
+    user_state.pop(chat_id, None)
+
+    bot.send_message(
+        chat_id,
+        result,
+        reply_markup=action_menu()
+    )
 
 @bot.message_handler(content_types=["text"])
 def text_handler(message):
     save_user(message.from_user)
     chat_id = message.chat.id
     state = user_state.get(chat_id)
+
+elif state.get("mode") == "site_audit":
+    handle_site_audit(message)
 
     if not state:
         bot.send_message(chat_id, "Выберите действие в меню 👇", reply_markup=main_menu())
