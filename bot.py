@@ -1,10 +1,10 @@
 import config
 import telebot
-from site_audit import analyze_site
 from telebot import types
 from fastapi import FastAPI, Request
 
 from ai import ask_ai
+from site_audit import analyze_site
 from database import init_db, save_user, save_lead, get_stats
 
 bot = telebot.TeleBot(config.BOT_TOKEN, parse_mode="HTML")
@@ -17,11 +17,11 @@ def main_menu():
     kb.add(
         types.InlineKeyboardButton("🤖 AI-консультант", callback_data="ai"),
         types.InlineKeyboardButton("🔎 Пройти AI-аудит бизнеса", callback_data="audit_start"),
+        types.InlineKeyboardButton("🌐 AI-анализ сайта", callback_data="site_audit"),
         types.InlineKeyboardButton("🏗️ Возможности Hitly", callback_data="features"),
         types.InlineKeyboardButton("💼 Подойдет ли моему бизнесу", callback_data="fit"),
         types.InlineKeyboardButton("🚀 Как подключиться", callback_data="connect"),
         types.InlineKeyboardButton("📞 Получить консультацию", callback_data="lead"),
-        types.InlineKeyboardButton("🌐 Анализ сайта", callback_data="site_audit"),
     )
     return kb
 
@@ -29,6 +29,7 @@ def main_menu():
 def action_menu():
     kb = types.InlineKeyboardMarkup(row_width=1)
     kb.add(
+        types.InlineKeyboardButton("🌐 Анализ сайта", callback_data="site_audit"),
         types.InlineKeyboardButton("🔎 Пройти AI-аудит", callback_data="audit_start"),
         types.InlineKeyboardButton("🚀 Подключить Hitly", url=config.PARTNER_LINK),
         types.InlineKeyboardButton("📞 Получить консультацию", callback_data="lead"),
@@ -58,8 +59,8 @@ def start(message):
         "Помогу понять:\n"
         "• какие процессы можно автоматизировать;\n"
         "• где бизнес может терять заявки;\n"
-        "• подойдет ли Hitly вашей компании;\n"
-        "• с чего начать внедрение.\n\n"
+        "• как улучшить сайт и обработку обращений;\n"
+        "• подойдет ли Hitly вашей компании.\n\n"
         "Выберите раздел:"
     )
     bot.send_message(message.chat.id, text, reply_markup=main_menu())
@@ -93,16 +94,6 @@ def callbacks(call):
     if call.data == "menu":
         user_state.pop(chat_id, None)
         bot.send_message(chat_id, "🏠 Главное меню", reply_markup=main_menu())
-        
-        elif call.data == "site_audit":
-    user_state[chat_id] = {"mode": "site_audit"}
-    bot.send_message(
-        chat_id,
-        "🌐 <b>AI-анализ сайта</b>\n\n"
-        "Отправьте ссылку на сайт.\n\n"
-        "Например:\n"
-        "https://example.ru"
-    )
 
     elif call.data == "ai":
         user_state[chat_id] = {"mode": "ai"}
@@ -114,6 +105,17 @@ def callbacks(call):
             "• Как Hitly поможет строительной компании?\n"
             "• Какие процессы можно автоматизировать?\n"
             "• Подойдет ли Hitly моему бизнесу?"
+        )
+
+    elif call.data == "site_audit":
+        user_state[chat_id] = {"mode": "site_audit"}
+        bot.send_message(
+            chat_id,
+            "🌐 <b>AI-анализ сайта</b>\n\n"
+            "Отправьте ссылку на сайт.\n\n"
+            "Например:\n"
+            "https://example.ru\n\n"
+            "Я сделаю первичный разбор: оффер, заявки, доверие, точки потери клиентов и что можно автоматизировать через Hitly."
         )
 
     elif call.data == "audit_start":
@@ -151,7 +153,7 @@ def callbacks(call):
             "• часть обращений теряется;\n"
             "• много повторяющихся вопросов;\n"
             "• нужен порядок в коммуникациях.\n\n"
-            "Лучше всего начать с AI-аудита бизнеса."
+            "Лучше всего начать с AI-аудита бизнеса или анализа сайта."
         )
         bot.send_message(chat_id, text, reply_markup=action_menu())
 
@@ -172,28 +174,6 @@ def callbacks(call):
 
     bot.answer_callback_query(call.id)
 
-def handle_site_audit(message):
-    chat_id = message.chat.id
-    site_url = message.text.strip()
-
-    if not site_url.startswith("http"):
-        bot.send_message(
-            chat_id,
-            "Пожалуйста, отправьте ссылку в формате:\nhttps://example.ru"
-        )
-        return
-
-    bot.send_chat_action(chat_id, "typing")
-
-    result = analyze_site(site_url)
-
-    user_state.pop(chat_id, None)
-
-    bot.send_message(
-        chat_id,
-        result,
-        reply_markup=action_menu()
-    )
 
 @bot.message_handler(content_types=["text"])
 def text_handler(message):
@@ -201,15 +181,15 @@ def text_handler(message):
     chat_id = message.chat.id
     state = user_state.get(chat_id)
 
-elif state.get("mode") == "site_audit":
-    handle_site_audit(message)
-
     if not state:
         bot.send_message(chat_id, "Выберите действие в меню 👇", reply_markup=main_menu())
         return
 
     if state.get("mode") == "ai":
         handle_ai(message)
+
+    elif state.get("mode") == "site_audit":
+        handle_site_audit(message)
 
     elif state.get("mode") == "audit":
         handle_audit(message, state)
@@ -231,6 +211,36 @@ def handle_ai(message):
 
     bot.send_message(chat_id, answer, reply_markup=action_menu())
     user_state.pop(chat_id, None)
+
+
+def handle_site_audit(message):
+    chat_id = message.chat.id
+    site_url = message.text.strip()
+
+    if not site_url.startswith("http"):
+        bot.send_message(
+            chat_id,
+            "Пожалуйста, отправьте ссылку в формате:\nhttps://example.ru"
+        )
+        return
+
+    bot.send_chat_action(chat_id, "typing")
+
+    result = analyze_site(site_url)
+
+    notify_admin(
+        "🌐 <b>Пользователь запросил AI-анализ сайта</b>\n\n"
+        f"Сайт: {site_url}\n"
+        f"User ID: {chat_id}"
+    )
+
+    user_state.pop(chat_id, None)
+
+    bot.send_message(
+        chat_id,
+        result,
+        reply_markup=action_menu()
+    )
 
 
 def handle_audit(message, state):
