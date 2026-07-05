@@ -1,5 +1,6 @@
 import config
 import telebot
+from catalog.callback import handle_catalog_callback
 from telebot import types
 from business_intel import analyze_market
 from fastapi import FastAPI, Request
@@ -20,7 +21,7 @@ def main_menu():
         types.InlineKeyboardButton("🔎 Пройти AI-аудит бизнеса", callback_data="audit_start"),
         types.InlineKeyboardButton("🌐 AI-анализ сайта", callback_data="site_audit"),
         types.InlineKeyboardButton("🕵️ AI-бизнес-разведка", callback_data="business_intel"),
-        types.InlineKeyboardButton("🏗️ Возможности Hitly", callback_data="features"),
+        types.InlineKeyboardButton("🚀 Каталог возможностей Hitly", callback_data="hitly_catalog"),
         types.InlineKeyboardButton("💼 Подойдет ли моему бизнесу", callback_data="fit"),
         types.InlineKeyboardButton("🚀 Как подключиться", callback_data="connect"),
         types.InlineKeyboardButton("📞 Получить консультацию", callback_data="lead"),
@@ -93,7 +94,11 @@ def stats(message):
 def callbacks(call):
     save_user(call.from_user)
     chat_id = call.message.chat.id
-
+    
+    if handle_catalog_callback(bot, call):
+        bot.answer_callback_query(call.id)
+        return
+        
     if call.data == "menu":
         user_state.pop(chat_id, None)
         bot.send_message(chat_id, "🏠 Главное меню", reply_markup=main_menu())
