@@ -1,6 +1,7 @@
 import config
 import telebot
 from telebot import types
+from business_intel import analyze_market
 from fastapi import FastAPI, Request
 
 from ai import ask_ai
@@ -18,6 +19,8 @@ def main_menu():
         types.InlineKeyboardButton("🤖 AI-консультант", callback_data="ai"),
         types.InlineKeyboardButton("🔎 Пройти AI-аудит бизнеса", callback_data="audit_start"),
         types.InlineKeyboardButton("🌐 AI-анализ сайта", callback_data="site_audit"),
+        types.InlineKeyboardButton("🌐 AI-анализ сайта", callback_data="site_audit"),
+        types.InlineKeyboardButton("🕵️ AI-бизнес-разведка", callback_data="business_intel"),
         types.InlineKeyboardButton("🏗️ Возможности Hitly", callback_data="features"),
         types.InlineKeyboardButton("💼 Подойдет ли моему бизнесу", callback_data="fit"),
         types.InlineKeyboardButton("🚀 Как подключиться", callback_data="connect"),
@@ -30,6 +33,7 @@ def action_menu():
     kb = types.InlineKeyboardMarkup(row_width=1)
     kb.add(
         types.InlineKeyboardButton("🌐 Анализ сайта", callback_data="site_audit"),
+        types.InlineKeyboardButton("🕵️ AI-бизнес-разведка", callback_data="business_intel"),
         types.InlineKeyboardButton("🔎 Пройти AI-аудит", callback_data="audit_start"),
         types.InlineKeyboardButton("🚀 Подключить Hitly", url=config.PARTNER_LINK),
         types.InlineKeyboardButton("📞 Получить консультацию", callback_data="lead"),
@@ -107,6 +111,19 @@ def callbacks(call):
             "• Подойдет ли Hitly моему бизнесу?"
         )
 
+    elif call.data == "business_intel":
+    user_state[chat_id] = {"mode": "business_intel"}
+    bot.send_message(
+        chat_id,
+        "🕵️ <b>AI-бизнес-разведка</b>\n\n"
+        "Напишите нишу и город.\n\n"
+        "Например:\n"
+        "• строительная компания Москва\n"
+        "• ремонт квартир Санкт-Петербург\n"
+        "• салон красоты Казань\n\n"
+        "Я подготовлю краткий анализ рынка, конкурентов, офферов и идей продвижения."
+    )
+    
     elif call.data == "site_audit":
         user_state[chat_id] = {"mode": "site_audit"}
         bot.send_message(
@@ -191,6 +208,9 @@ def text_handler(message):
     elif state.get("mode") == "site_audit":
         handle_site_audit(message)
 
+    elif state.get("mode") == "business_intel":
+    handle_business_intel(message)
+
     elif state.get("mode") == "audit":
         handle_audit(message, state)
 
@@ -242,6 +262,34 @@ def handle_site_audit(message):
         reply_markup=action_menu()
     )
 
+def handle_business_intel(message):
+    chat_id = message.chat.id
+    query = message.text.strip()
+
+    if len(query) < 5:
+        bot.send_message(
+            chat_id,
+            "Напишите нишу и город подробнее.\n\nНапример:\nстроительная компания Москва"
+        )
+        return
+
+    bot.send_chat_action(chat_id, "typing")
+
+    result = analyze_market(query)
+
+    notify_admin(
+        "🕵️ <b>Пользователь запросил AI-бизнес-разведку</b>\n\n"
+        f"Запрос: {query}\n"
+        f"User ID: {chat_id}"
+    )
+
+    user_state.pop(chat_id, None)
+
+    bot.send_message(
+        chat_id,
+        result,
+        reply_markup=action_menu()
+    )
 
 def handle_audit(message, state):
     chat_id = message.chat.id
