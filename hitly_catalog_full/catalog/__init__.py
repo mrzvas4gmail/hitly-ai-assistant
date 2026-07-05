@@ -1,1 +1,0 @@
-# Hitly catalog package
