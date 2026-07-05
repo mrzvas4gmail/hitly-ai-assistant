@@ -19,7 +19,6 @@ def main_menu():
         types.InlineKeyboardButton("🤖 AI-консультант", callback_data="ai"),
         types.InlineKeyboardButton("🔎 Пройти AI-аудит бизнеса", callback_data="audit_start"),
         types.InlineKeyboardButton("🌐 AI-анализ сайта", callback_data="site_audit"),
-        types.InlineKeyboardButton("🌐 AI-анализ сайта", callback_data="site_audit"),
         types.InlineKeyboardButton("🕵️ AI-бизнес-разведка", callback_data="business_intel"),
         types.InlineKeyboardButton("🏗️ Возможности Hitly", callback_data="features"),
         types.InlineKeyboardButton("💼 Подойдет ли моему бизнесу", callback_data="fit"),
@@ -112,17 +111,17 @@ def callbacks(call):
         )
 
     elif call.data == "business_intel":
-    user_state[chat_id] = {"mode": "business_intel"}
-    bot.send_message(
-        chat_id,
-        "🕵️ <b>AI-бизнес-разведка</b>\n\n"
-        "Напишите нишу и город.\n\n"
-        "Например:\n"
-        "• строительная компания Москва\n"
-        "• ремонт квартир Санкт-Петербург\n"
-        "• салон красоты Казань\n\n"
-        "Я подготовлю краткий анализ рынка, конкурентов, офферов и идей продвижения."
-    )
+        user_state[chat_id] = {"mode": "business_intel"}
+        bot.send_message(
+            chat_id,
+            "🕵️ <b>AI-бизнес-разведка</b>\n\n"
+            "Напишите нишу и город.\n\n"
+            "Например:\n"
+            "• строительная компания Москва\n"
+            "• ремонт квартир Санкт-Петербург\n"
+            "• салон красоты Казань\n\n"
+            "Я подготовлю краткий анализ рынка, конкурентов, офферов и идей продвижения."
+        )
     
     elif call.data == "site_audit":
         user_state[chat_id] = {"mode": "site_audit"}
@@ -209,7 +208,7 @@ def text_handler(message):
         handle_site_audit(message)
 
     elif state.get("mode") == "business_intel":
-    handle_business_intel(message)
+        handle_business_intel(message)
 
     elif state.get("mode") == "audit":
         handle_audit(message, state)
